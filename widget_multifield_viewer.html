@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Commentaires spécialistes — Grist widget</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #f5f5f4;
+      --surface:      #ffffff;
+      --border:       #e4e4e2;
+      --border-strong:#c8c8c5;
+      --text:         #18181b;
+      --muted:        #71717a;
+      --accent:       #2563eb;
+      --hover:        #f0f6ff;
+      --focus-ring:   0 0 0 2px rgba(37,99,235,.35);
+      --radius:       5px;
+      --shadow:       0 1px 2px rgba(0,0,0,.06), 0 1px 4px rgba(0,0,0,.04);
+      --font:         'IBM Plex Sans', system-ui, sans-serif;
+      --mono:         'IBM Plex Mono', monospace;
+    }
+
+    html, body { margin: 0; padding: 0; height: 0; overflow: hidden; background: var(--bg); }
+
+    #app {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; flex-direction: column; overflow: hidden;
+      font-family: var(--font); color: var(--text); font-size: 13px; line-height: 1.5;
+      background: var(--bg);
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap; min-height: 36px;
+    }
+    .toolbar-title {
+      font-size: 12px; font-weight: 600; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+    }
+    .toolbar-title.empty { font-style: italic; color: var(--muted); font-weight: 400; }
+    .toolbar-right { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+    .toolbar-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
+
+    .btn-icon {
+      display: flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; padding: 0;
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      background: var(--surface); cursor: pointer; outline: none; flex-shrink: 0;
+      transition: background .1s, border-color .1s; color: var(--muted);
+    }
+    .btn-icon:hover { background: var(--bg); border-color: var(--muted); color: var(--text); }
+    .btn-icon.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-icon:focus-visible { box-shadow: var(--focus-ring); }
+
+    /* ── Panneau réglages ── */
+    .settings-panel {
+      display: none; flex-direction: column; gap: 12px; padding: 10px 14px;
+      background: var(--surface); border-bottom: 2px solid var(--accent);
+      flex-shrink: 0; max-height: 50vh; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg);
+    }
+    .settings-panel.open { display: flex; }
+
+    .setting-section-title {
+      font-size: 10px; font-weight: 600; letter-spacing: .05em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
+    }
+
+    .display-mode-row { display: flex; gap: 5px; flex-wrap: wrap; }
+    .mode-btn {
+      font-family: var(--font); font-size: 11px; padding: 2px 9px;
+      border: 1px solid var(--border-strong); border-radius: 10px;
+      background: var(--bg); color: var(--muted); cursor: pointer; outline: none;
+      transition: background .1s, border-color .1s, color .1s;
+    }
+    .mode-btn:hover { border-color: var(--muted); color: var(--text); }
+    .mode-btn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode-btn:focus-visible { box-shadow: var(--focus-ring); }
+
+    .fields-list { display: flex; flex-direction: column; gap: 3px; }
+    .field-cfg-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+    .field-cfg-row input[type="checkbox"] {
+      accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; flex-shrink: 0;
+    }
+    .field-cfg-colname {
+      font-family: var(--mono); font-size: 10px; color: var(--muted);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    }
+    .field-cfg-input {
+      font-family: var(--font); font-size: 11px; padding: 2px 6px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      color: var(--text); background: var(--bg); outline: none; max-width: 200px; flex: 1.5;
+    }
+    .field-cfg-input:focus { border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+    /* ── Contenu ── */
+    .content {
+      flex: 1; min-height: 0; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg);
+    }
+    .content::-webkit-scrollbar { width: 8px; }
+    .content::-webkit-scrollbar-track { background: var(--bg); }
+    .content::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; border: 2px solid var(--bg); }
+    .content::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ── Empty state ── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 10px; color: var(--muted); text-align: center; padding: 20px;
+    }
+    .empty svg { opacity: .25; }
+    .empty-title { font-size: 13px; font-weight: 500; color: var(--text); }
+    .empty-sub   { font-size: 12px; }
+
+    /* ── Mode ONGLETS ── */
+    .tabs-wrapper { display: flex; flex-direction: column; height: 100%; }
+    .tabs-bar {
+      display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px 0;
+      border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+    }
+    .tab-btn {
+      font-family: var(--font); font-size: 11px; font-weight: 500;
+      padding: 4px 11px 5px; border: 1px solid var(--border-strong);
+      border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
+      background: var(--bg); color: var(--muted); cursor: pointer; outline: none;
+      transition: background .1s, color .1s; white-space: nowrap; position: relative; top: 1px;
+    }
+    .tab-btn:hover { background: var(--hover); color: var(--text); }
+    .tab-btn.active {
+      background: var(--surface); color: var(--text);
+      border-color: var(--border); border-bottom-color: var(--surface); z-index: 1;
+    }
+    .tab-btn.tab-empty { opacity: .45; }
+    .tab-btn:focus-visible { box-shadow: var(--focus-ring); }
+    .tab-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      margin-right: 5px; background: currentColor; opacity: .5;
+    }
+    .tab-panel {
+      flex: 1; min-height: 0; overflow-y: auto; padding: 14px;
+      scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg);
+    }
+    .tab-panel::-webkit-scrollbar { width: 8px; }
+    .tab-panel::-webkit-scrollbar-track { background: var(--bg); }
+    .tab-panel::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; border: 2px solid var(--bg); }
+    .tab-content-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+    .tab-content-text  { font-size: 13px; line-height: 1.7; white-space: pre-wrap; color: var(--text); }
+
+    /* ── Mode LISTE ── */
+    .list-wrapper { display: flex; flex-direction: column; }
+    .list-item { border-bottom: 1px solid var(--border); background: var(--surface); }
+    .list-item:last-child { border-bottom: none; }
+    .list-item-header {
+      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+      cursor: pointer; user-select: none; outline: none; transition: background .1s;
+    }
+    .list-item-header:hover { background: var(--hover); }
+    .list-item-header:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+    .list-chevron {
+      width: 14px; height: 14px; flex-shrink: 0; color: var(--muted);
+      transition: transform .2s;
+    }
+    .list-item.open .list-chevron { transform: rotate(90deg); }
+    .list-item-label { font-size: 12px; font-weight: 600; flex: 1; color: var(--text); }
+    .list-item-badge {
+      font-family: var(--mono); font-size: 10px; padding: 1px 6px;
+      border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+      color: var(--muted); flex-shrink: 0;
+    }
+    .list-item-badge.has-content { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+    .list-item-body {
+      display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s;
+    }
+    .list-item.open .list-item-body { grid-template-rows: 1fr; border-top: 1px solid var(--border); }
+    .list-item-body-inner { overflow: hidden; }
+    .list-item-body-text {
+      padding: 10px 14px 12px 34px;
+      font-size: 13px; line-height: 1.7; white-space: pre-wrap; color: var(--text);
+    }
+    .list-item-body-empty {
+      padding: 10px 14px 12px 34px;
+      font-size: 12px; color: var(--muted); font-style: italic;
+    }
+
+    /* ── Mode GRILLE ── */
+    .grid-wrapper {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;
+    }
+    .grid-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+    }
+    .grid-card-header {
+      padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .grid-card-body {
+      padding: 8px 10px; font-size: 12px; line-height: 1.6;
+      white-space: pre-wrap; color: var(--text); max-height: 120px; overflow-y: auto;
+    }
+    .grid-card-body.empty { color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header class="toolbar" role="toolbar">
+    <span class="toolbar-title empty" id="toolbar-title"></span>
+    <div class="toolbar-right">
+      <div class="toolbar-sep"></div>
+      <button class="btn-icon" id="btn-settings" type="button"
+              aria-expanded="false" aria-controls="settings-panel" aria-label="Réglages">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
+                   a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+                   A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+                   l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                   A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
+                   l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                   a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
+                   l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+                   a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="settings-panel" id="settings-panel">
+    <div>
+      <p class="setting-section-title">Mode d'affichage</p>
+      <div class="display-mode-row" id="mode-row" role="radiogroup" aria-label="Mode d'affichage"></div>
+    </div>
+    <div>
+      <p class="setting-section-title">Champs affichés &amp; libellés</p>
+      <div class="fields-list" id="fields-list"></div>
+    </div>
+  </div>
+
+  <main class="content" id="content"></main>
+
+</div>
+<script>
+// ══════════════════════════════════════════
+// I18N
+// ══════════════════════════════════════════
+const LANG = (navigator.language || 'fr').startsWith('fr') ? 'fr' : 'en';
+const T = {
+  fr: {
+    noRecord: 'Sélectionnez un élève dans la table.',
+    noRecordSub: 'Le contenu s\'affichera ici.',
+    emptyField: '(aucun contenu)',
+    modeTab: 'Onglets', modeList: 'Liste', modeGrid: 'Grille',
+  },
+  en: {
+    noRecord: 'Select a student in the table.',
+    noRecordSub: 'Content will appear here.',
+    emptyField: '(no content)',
+    modeTab: 'Tabs', modeList: 'List', modeGrid: 'Grid',
+  }
+}[LANG];
+
+// ══════════════════════════════════════════
+// CHAMPS PAR DÉFAUT
+// ══════════════════════════════════════════
+const DEFAULT_FIELDS = [
+  { col: 'Avis_famille_internat',                                                            label: 'Avis famille internat',      visible: true },
+  { col: 'Avis_famille_apprentissage',                                                       label: 'Avis famille apprentissage', visible: true },
+  { col: 'Motivation_de_l_eleve_et_de_sa_famille',                                           label: 'Motivation élève & famille', visible: true },
+  { col: 'avis_de_l_enseignant_accompagnateur_du_projet_de_l_eleve',                         label: 'Enseignant accompagnateur',  visible: true },
+  { col: 'avis_du_chef_d_etablissement_prenant_appui_sur_la_decision_du_conseil_de_classe',  label: 'Chef d\'établissement',      visible: true },
+  { col: 'avis_du_medecin_de_l_education_nationale_si_besoin_et_dans_la_mesure_du_possible', label: 'Médecin EN',                 visible: true },
+  { col: 'avis_des_partenaires_de_soin_esms_sessad_etc_nom_et_fonction',                     label: 'Partenaires de soin',        visible: true },
+  { col: 'situation_particuliere',                                                            label: 'Situation particulière',     visible: true },
+  { col: 'commentaires',                                                                      label: 'Commentaires',               visible: true },
+];
+
+const DISPLAY_MODES = ['tab', 'list', 'grid'];
+
+// ══════════════════════════════════════════
+// ÉTAT
+// ══════════════════════════════════════════
+let fields      = JSON.parse(JSON.stringify(DEFAULT_FIELDS));
+let displayMode = 'tab';
+let currentRecord = null;
+let activeTab   = 0;
+
+// ══════════════════════════════════════════
+// DOM
+// ══════════════════════════════════════════
+const btnSettings   = document.getElementById('btn-settings');
+const settingsPanel = document.getElementById('settings-panel');
+const content       = document.getElementById('content');
+const toolbarTitle  = document.getElementById('toolbar-title');
+const modeRow       = document.getElementById('mode-row');
+const fieldsList    = document.getElementById('fields-list');
+
+// ══════════════════════════════════════════
+// PANNEAU RÉGLAGES
+// ══════════════════════════════════════════
+btnSettings.addEventListener('click', () => {
+  const isOpen = settingsPanel.classList.toggle('open');
+  btnSettings.classList.toggle('active', isOpen);
+  btnSettings.setAttribute('aria-expanded', String(isOpen));
+  if (isOpen) { buildModeButtons(); buildFieldsList(); }
+});
+
+function buildModeButtons() {
+  modeRow.innerHTML = '';
+  const labels = { tab: T.modeTab, list: T.modeList, grid: T.modeGrid };
+  DISPLAY_MODES.forEach(mode => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mode-btn' + (mode === displayMode ? ' selected' : '');
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', String(mode === displayMode));
+    btn.textContent = labels[mode];
+    btn.addEventListener('click', () => {
+      displayMode = mode;
+      modeRow.querySelectorAll('.mode-btn').forEach(b => {
+        b.classList.remove('selected'); b.setAttribute('aria-checked', 'false');
+      });
+      btn.classList.add('selected'); btn.setAttribute('aria-checked', 'true');
+      grist.setOption('displayMode', displayMode);
+      render();
+    });
+    modeRow.appendChild(btn);
+  });
+}
+
+function buildFieldsList() {
+  fieldsList.innerHTML = '';
+  fields.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'field-cfg-row';
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.checked = f.visible;
+    chk.setAttribute('aria-label', 'Afficher ' + f.col);
+    chk.addEventListener('change', () => { fields[i].visible = chk.checked; saveFields(); render(); });
+
+    const colName = document.createElement('span');
+    colName.className = 'field-cfg-colname';
+    colName.textContent = f.col; colName.title = f.col;
+
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'field-cfg-input';
+    inp.value = f.label; inp.placeholder = f.col;
+    inp.addEventListener('input', () => { fields[i].label = inp.value || f.col; saveFields(); render(); });
+
+    row.appendChild(chk); row.appendChild(colName); row.appendChild(inp);
+    fieldsList.appendChild(row);
+  });
+}
+
+function saveFields() {
+  grist.setOption('fields', JSON.stringify(fields));
+}
+
+// ══════════════════════════════════════════
+// RENDU
+// ══════════════════════════════════════════
+function render() {
+  if (!currentRecord) {
+    content.innerHTML = `
+      <div class="empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <p class="empty-title">${T.noRecord}</p>
+        <p class="empty-sub">${T.noRecordSub}</p>
+      </div>`;
+    toolbarTitle.textContent = '';
+    toolbarTitle.className = 'toolbar-title empty';
+    return;
+  }
+  const visible = fields.filter(f => f.visible);
+  if (displayMode === 'tab')  renderTabs(visible);
+  if (displayMode === 'list') renderList(visible);
+  if (displayMode === 'grid') renderGrid(visible);
+}
+
+// ── Onglets ──
+function renderTabs(visible) {
+  if (activeTab >= visible.length) activeTab = 0;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tabs-wrapper';
+
+  const bar = document.createElement('div');
+  bar.className = 'tabs-bar';
+  bar.setAttribute('role', 'tablist');
+
+  visible.forEach((f, i) => {
+    const val = (currentRecord[f.col] || '').toString().trim();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tab-btn' + (i === activeTab ? ' active' : '') + (!val ? ' tab-empty' : '');
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', String(i === activeTab));
+
+    const dot = document.createElement('span');
+    dot.className = 'tab-dot';
+    dot.style.background = val ? 'var(--accent)' : 'var(--muted)';
+    btn.appendChild(dot);
+    btn.appendChild(document.createTextNode(f.label));
+    btn.addEventListener('click', () => { activeTab = i; render(); });
+    bar.appendChild(btn);
+  });
+
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel';
+  panel.setAttribute('role', 'tabpanel');
+  const active = visible[activeTab] || visible[0];
+  const val = active ? (currentRecord[active.col] || '').toString().trim() : '';
+  const p = document.createElement('p');
+  p.className = val ? 'tab-content-text' : 'tab-content-empty';
+  p.textContent = val || T.emptyField;
+  panel.appendChild(p);
+
+  wrapper.appendChild(bar);
+  wrapper.appendChild(panel);
+  content.innerHTML = '';
+  content.appendChild(wrapper);
+}
+
+// ── Liste accordéon ──
+function renderList(visible) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'list-wrapper';
+
+  visible.forEach(f => {
+    const val = (currentRecord[f.col] || '').toString().trim();
+    const item = document.createElement('div');
+    item.className = 'list-item';
+
+    const header = document.createElement('div');
+    header.className = 'list-item-header';
+    header.setAttribute('role', 'button'); header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', 'false');
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', 'list-chevron'); svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.5'); svg.setAttribute('aria-hidden', 'true');
+    const poly = document.createElementNS(svgNS, 'polyline');
+    poly.setAttribute('points', '9 6 15 12 9 18');
+    svg.appendChild(poly);
+
+    const label = document.createElement('span');
+    label.className = 'list-item-label'; label.textContent = f.label;
+
+    const badge = document.createElement('span');
+    badge.className = 'list-item-badge' + (val ? ' has-content' : '');
+    badge.textContent = val ? '✓' : '—';
+
+    header.appendChild(svg); header.appendChild(label); header.appendChild(badge);
+
+    const body = document.createElement('div');
+    body.className = 'list-item-body';
+    const inner = document.createElement('div');
+    inner.className = 'list-item-body-inner';
+    const txt = document.createElement('p');
+    txt.className = val ? 'list-item-body-text' : 'list-item-body-empty';
+    txt.textContent = val || T.emptyField;
+    inner.appendChild(txt); body.appendChild(inner);
+
+    const toggle = () => {
+      const isOpen = item.classList.toggle('open');
+      header.setAttribute('aria-expanded', String(isOpen));
+    };
+    header.addEventListener('click', toggle);
+    header.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+
+    item.appendChild(header); item.appendChild(body);
+    wrapper.appendChild(item);
+  });
+
+  content.innerHTML = ''; content.appendChild(wrapper);
+}
+
+// ── Grille ──
+function renderGrid(visible) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'grid-wrapper';
+
+  visible.forEach(f => {
+    const val = (currentRecord[f.col] || '').toString().trim();
+    const card = document.createElement('div');
+    card.className = 'grid-card';
+
+    const head = document.createElement('div');
+    head.className = 'grid-card-header'; head.textContent = f.label; head.title = f.label;
+
+    const body = document.createElement('div');
+    body.className = 'grid-card-body' + (val ? '' : ' empty');
+    body.textContent = val || T.emptyField;
+
+    card.appendChild(head); card.appendChild(body);
+    wrapper.appendChild(card);
+  });
+
+  content.innerHTML = ''; content.appendChild(wrapper);
+}
+
+// ══════════════════════════════════════════
+// GRIST
+// ══════════════════════════════════════════
+grist.ready({ requiredAccess: 'read table' });
+
+grist.onOptions(opts => {
+  if (opts) {
+    if (opts.displayMode && DISPLAY_MODES.includes(opts.displayMode))
+      displayMode = opts.displayMode;
+    if (opts.fields) {
+      try {
+        const saved = JSON.parse(opts.fields);
+        fields = DEFAULT_FIELDS.map(def => {
+          const s = saved.find(x => x.col === def.col);
+          return s ? { ...def, label: s.label, visible: s.visible } : def;
+        });
+        saved.forEach(s => { if (!fields.find(f => f.col === s.col)) fields.push(s); });
+      } catch(e) {}
+    }
+  }
+  render();
+});
+
+grist.onRecord(record => {
+  currentRecord = record;
+  const name = [record.Prenom, record.Nom, record.prenom, record.nom, record.name]
+    .filter(Boolean).join(' ').trim();
+  toolbarTitle.textContent = name || '—';
+  toolbarTitle.className = 'toolbar-title' + (name ? '' : ' empty');
+  render();
+});
+</script>
+</body>
+</html>
