@@ -41,7 +41,7 @@
     }
 
     .tab-btn {
-      font-family: var(--font); font-size: 11px; font-weight: 500;
+      font-family: var(--font); font-size: 13px; font-weight: 500;
       padding: 4px 10px 5px; border: 1px solid var(--border-strong);
       border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
       background: var(--bg); color: var(--muted); cursor: pointer; outline: none;
@@ -172,6 +172,14 @@
   <!-- Panneau réglages (sous la barre) -->
   <div class="settings-panel" id="settings-panel">
 
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:2px">
+      <span style="font-size:12px;font-weight:600;color:var(--text)">🔒 Verrouiller pour les consultants</span>
+      <button id="btn-lock" type="button" role="switch" aria-checked="false"
+        style="font-family:var(--font);font-size:11px;padding:3px 10px;border:1px solid var(--border-strong);border-radius:10px;background:var(--bg);color:var(--muted);cursor:pointer;outline:none;transition:background .1s,color .1s,border-color .1s;">
+        Non
+      </button>
+    </div>
+
     <div>
       <p class="setting-section-title">Colonne titre</p>
       <select class="title-select" id="title-col-select">
@@ -224,6 +232,7 @@ let allCols      = [];
 let excludedCols = new Set();
 let fields       = [];   // { col, label, desc, visible }
 let titleCol     = '';
+let locked       = false;
 let currentRecord = null;
 let activeTab    = 0;
 
@@ -256,6 +265,19 @@ function initColsFromRecord(record) {
 // PANNEAU RÉGLAGES
 // ══════════════════════════════════════════
 function buildSettings() {
+  // Bouton verrou
+  const btnLock = document.getElementById('btn-lock');
+  if (btnLock) {
+    btnLock.textContent = locked ? 'Oui 🔒' : 'Non';
+    btnLock.style.background   = locked ? 'var(--accent)' : 'var(--bg)';
+    btnLock.style.color        = locked ? '#fff'          : 'var(--muted)';
+    btnLock.style.borderColor  = locked ? 'var(--accent)' : 'var(--border-strong)';
+    btnLock.setAttribute('aria-checked', String(locked));
+    btnLock.onclick = () => {
+      locked = !locked;
+      saveOptions(); buildSettings(); renderTabs();
+    };
+  }
   buildTitleColSelect();
   buildExclRow();
   buildFieldsList();
@@ -314,6 +336,10 @@ function buildFieldsList() {
     inpLabel.type = 'text'; inpLabel.className = 'field-cfg-label';
     inpLabel.value = f.label; inpLabel.placeholder = f.col;
     inpLabel.addEventListener('input', () => { fields[i].label = inpLabel.value || f.col; saveOptions(); renderTabs(); });
+    inpLabel.addEventListener('blur',  () => {
+      const newLabel = inpLabel.value.trim();
+      if (newLabel && newLabel !== f.col) renameGristColumn(f.col, newLabel);
+    });
 
     const inpDesc = document.createElement('input');
     inpDesc.type = 'text'; inpDesc.className = 'field-cfg-desc';
@@ -356,7 +382,7 @@ function renderTabs() {
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <p class="empty-title">${T.noRecord}</p><p class="empty-sub">${T.noRecordSub}</p>
     </div>`;
-    appendSettingsBtn();
+    if (!locked) appendSettingsBtn();
     return;
   }
 
@@ -367,7 +393,7 @@ function renderTabs() {
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M9 21V9"/></svg>
       <p class="empty-title">${T.noFields}</p><p class="empty-sub">${T.noFieldsSub}</p>
     </div>`;
-    appendSettingsBtn();
+    if (!locked) appendSettingsBtn();
     return;
   }
 
@@ -395,7 +421,7 @@ function renderTabs() {
     btn.setAttribute('aria-selected', String(i === activeTab));
 
     // Tooltip : desc si renseignée, sinon nom de colonne brut
-    btn.title = f.desc ? `${f.desc}\n[${f.col}]` : f.col;
+    btn.title = f.desc || '';
 
     const dot = document.createElement('span');
     dot.className = 'tab-dot';
@@ -406,8 +432,8 @@ function renderTabs() {
     tabsBar.appendChild(btn);
   });
 
-  // Roue après le dernier onglet
-  appendSettingsBtn();
+  // Roue après le dernier onglet — masquée si verrouillé
+  if (!locked) appendSettingsBtn();
 
   // Contenu
   const active = visible[activeTab];
@@ -443,19 +469,31 @@ function appendSettingsBtn() {
 }
 
 // ══════════════════════════════════════════
-// PERSISTANCE
+// PERSISTANCE — localStorage (pas de barre "Enregistrer" Grist)
 // ══════════════════════════════════════════
+let storageKey = 'grist_mfv_default';
+
 function saveOptions() {
-  grist.setOption('titleCol',     titleCol);
-  grist.setOption('excludedCols', JSON.stringify([...excludedCols]));
-  grist.setOption('fields',       JSON.stringify(fields));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify({
+      titleCol,
+      locked,
+      excludedCols: [...excludedCols],
+      fields,
+    }));
+  } catch(e) {}
 }
 
-function loadOptions(opts) {
-  if (!opts) return;
-  if (opts.titleCol !== undefined) titleCol = opts.titleCol;
-  if (opts.excludedCols) { try { excludedCols = new Set(JSON.parse(opts.excludedCols)); } catch(e) {} }
-  if (opts.fields)       { try { fields = JSON.parse(opts.fields); } catch(e) {} }
+function loadOptions() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return;
+    const opts = JSON.parse(raw);
+    if (opts.titleCol !== undefined)  titleCol = opts.titleCol;
+    if (opts.locked !== undefined)    locked   = opts.locked;
+    if (opts.excludedCols)            excludedCols = new Set(opts.excludedCols);
+    if (opts.fields)                  fields   = opts.fields;
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════
@@ -471,42 +509,63 @@ function toString(val) {
 // ══════════════════════════════════════════
 // GRIST
 // ══════════════════════════════════════════
-let colDescriptions = {}; // { colId: description }
+let colDescriptions = {};
+let colMetaRowIds   = {}; // { colId: rowId dans _grist_Tables_column }
 
-async function fetchColDescriptions() {
+async function fetchColMeta() {
   try {
     const meta = await grist.docApi.fetchTable('_grist_Tables_column');
-    // meta.colId[] et meta.description[] sont des tableaux parallèles
-    if (meta && meta.colId && meta.description) {
+    if (meta && meta.colId) {
       meta.colId.forEach((colId, i) => {
         const desc = (meta.description[i] || '').trim();
         if (desc) colDescriptions[colId] = desc;
+        colMetaRowIds[colId] = meta.id[i];
       });
     }
+  } catch(e) {}
+}
+
+async function renameGristColumn(colId, newLabel) {
+  try {
+    const rowId = colMetaRowIds[colId];
+    if (!rowId) return;
+    await grist.docApi.applyUserActions([
+      ['UpdateRecord', '_grist_Tables_column', rowId, { label: newLabel }]
+    ]);
   } catch(e) {
-    // Silencieux si accès refusé ou table inexistante
+    console.warn('Renommage colonne Grist échoué :', e);
   }
 }
 
-grist.ready({ requiredAccess: 'read table' });
+function openSettings() {
+  settingsPanel.classList.add('open');
+  buildSettings();
+  renderTabs();
+}
 
-grist.onOptions(opts => { loadOptions(opts); renderTabs(); });
+grist.ready({
+  requiredAccess: 'full',
+  onEditOptions: openSettings,
+});
 
 grist.onRecord(async record => {
   const firstRecord = !currentRecord;
   currentRecord = record;
-  // Récupère les descriptions au premier enregistrement reçu
-  if (firstRecord) await fetchColDescriptions();
+  if (firstRecord) {
+    // Clé localStorage basée sur le tableId pour isoler les instances
+    try {
+      const tableId = await grist.selectedTable.getTableId();
+      storageKey = 'grist_mfv_' + tableId;
+    } catch(e) {}
+    loadOptions();
+    await fetchColMeta();
+  }
   initColsFromRecord(record);
   if (fields.length === 0) {
     fields = allCols.filter(c => !excludedCols.has(c)).map(col => ({
-      col,
-      label: col,
-      desc: colDescriptions[col] || '',
-      visible: true
+      col, label: col, desc: colDescriptions[col] || '', visible: true
     }));
   } else {
-    // Met à jour desc uniquement si le champ n'a pas été personnalisé
     fields.forEach(f => {
       if (!f._descCustomized && colDescriptions[f.col])
         f.desc = colDescriptions[f.col];
