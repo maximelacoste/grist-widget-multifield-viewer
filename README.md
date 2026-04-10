@@ -3,6 +3,10 @@
 > Grist custom widget — multi-field text viewer with tabs, configurable labels, native column description tooltips, lock mode for read-only users, and Grist column renaming.  
 > Visionneur de champs texte avec onglets, libellés personnalisables, infobulles natives, mode verrouillage et renommage des colonnes Grist.
 
+![Vue onglets](screenshot-tabs.png)
+
+![Panneau de réglages](screenshot-settings.png)
+
 ---
 
 ## 🇫🇷 Français
@@ -18,8 +22,8 @@ Conçu pour des tables contenant plusieurs champs texte longs — avis de spéci
 * **Vue en onglets** — un onglet par champ, point coloré selon présence de contenu, texte complet dans le panneau
 * **Colonnes dynamiques** — détectées automatiquement depuis l'enregistrement, aucune colonne codée en dur
 * **Infobulles au survol** — alimentées automatiquement depuis les **descriptions natives des colonnes Grist** (panneau colonne → Description), surchargeables manuellement
-* **Renommage synchronisé** — modifier le libellé d'un onglet met à jour simultanément le label dans Grist
-* **Mode verrouillage 🔒** — masque le bouton ⚙️ pour les consultants ; les éditeurs gardent accès via ⋯ → Options du widget
+* **Renommage synchronisé** — double-clic sur un onglet pour renommer : met à jour le libellé widget ET le label Grist simultanément
+* **Mode verrouillage 🔒** — masque les réglages pour les consultants ; les éditeurs gardent accès via ⋯ → Options du widget
 * **Colonnes exclues** — masquer des colonnes du widget en un clic, réintégrables à tout moment
 * **Réordonnancement** — glisser-déposer pour changer l'ordre des onglets
 * **Colonne titre** — choisir la colonne affichée dans la barre (ex. nom de la personne)
@@ -35,20 +39,21 @@ Tu peux surcharger cette description dans le panneau ⚙️ — la valeur person
 
 ### Renommage des colonnes
 
-Modifier le libellé d'un champ dans le panneau ⚙️ et quitter le champ (Tab ou clic ailleurs) met à jour **en même temps** :
-- le libellé affiché dans l'onglet du widget
-- le label de la colonne dans Grist (via `_grist_Tables_column`)
+Double-clic sur un onglet → édition inline. Au blur ou à la validation (`Enter`) :
+- le libellé affiché dans l'onglet est mis à jour
+- le label de la colonne dans Grist est mis à jour via `_grist_Tables_column`
 
 Le `colId` (identifiant interne) reste inchangé — les formules et références ne cassent pas.
 
 ### Mode verrouillage
 
-Active le verrou 🔒 dans le panneau ⚙️ pour masquer le bouton de configuration aux utilisateurs en lecture seule. Les éditeurs du document conservent toujours l'accès aux réglages via le menu **⋯ → Options du widget**.
+Active le verrou 🔒 dans le panneau ⚙️ pour griser et désactiver le bouton de configuration pour les utilisateurs en lecture seule. Les éditeurs du document conservent toujours l'accès via **⋯ → Options du widget**.
 
 ### Installation
 
 1. Dans ta page Grist, ajouter une vue → **Widget personnalisé**
-2. Renseigner l'URL du fichier hébergé (voir ci-dessous)
+2. Renseigner l'URL :  
+   `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
 3. Sélectionner l'accès **"Complet"** (nécessaire pour le renommage de colonnes)
 4. Lier le widget à ta table principale via **"Données de"**
 
@@ -58,21 +63,13 @@ Clique sur l'icône ⚙️ dans la barre d'onglets (ou via ⋯ → Options du wi
 
 | Option | Description |
 |---|---|
-| **🔒 Verrouiller** | Masque ⚙️ pour les consultants |
+| **🔒 Verrouiller** | Grise ⚙️ pour les consultants |
 | **Colonne titre** | Colonne affichée dans la barre (ex. Nom, Titre) |
 | **Colonnes exclues** | Clic pour exclure / réintégrer une colonne |
 | **Libellé** | Renomme l'onglet ET le label Grist (au blur) |
 | **Infobulle** | Texte au survol (pré-rempli depuis la description Grist) |
 | **Tout cocher / décocher** | Afficher ou masquer tous les champs en un clic |
 | **⠿ Glisser-déposer** | Réordonner les onglets |
-
-### Hébergement
-
-Fichier HTML autonome, sans dépendance npm ni étape de build.
-
-* **GitHub Pages** : activer Pages sur ce dépôt (`Settings → Pages → main / root`), utiliser :  
-  `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
-* **Tout serveur HTTP statique** (Scalingo, Netlify, WebDAV public…)
 
 ---
 
@@ -89,37 +86,20 @@ Designed for tables with multiple long text fields — specialist opinions, stru
 * **Tabs view** — one tab per field, colored dot indicating content presence, full text in the panel
 * **Dynamic columns** — auto-detected from the record, no hardcoded column names
 * **Hover tooltips** — auto-populated from **native Grist column descriptions** (column panel → Description), manually overridable
-* **Synchronized renaming** — editing a tab label also updates the Grist column label
-* **Lock mode 🔒** — hides the ⚙️ button for read-only users; editors keep access via ⋯ → Widget options
+* **Synchronized renaming** — double-click a tab to rename inline: updates both the widget label and the Grist column label simultaneously
+* **Lock mode 🔒** — grays out the ⚙️ button for read-only users; editors keep access via ⋯ → Widget options
 * **Excluded columns** — hide columns from the widget in one click, re-includable at any time
 * **Reordering** — drag and drop to change tab order
 * **Title column** — choose which column is displayed in the tab bar
-* **Options persisted in `localStorage`** — no Grist "Save" bar, configuration isolated per table
+* **localStorage persistence** — no Grist "Save layout" bar triggered on config changes, config scoped per table
 * **Bilingual** — automatic FR / EN detection via `navigator.language`
 * **Accessible** — ARIA roles, keyboard navigation, visible focus
-
-### Tooltips and column descriptions
-
-The widget automatically reads native column descriptions from `_grist_Tables_column`. If a column has a description (set in **Column panel → Description**), it is automatically used as the hover tooltip.
-
-You can override this in the widget's ⚙️ panel — the custom value takes precedence and will no longer be overwritten.
-
-### Column renaming
-
-Editing a field label in the ⚙️ panel and leaving the field (Tab or click away) updates **simultaneously**:
-- the tab label displayed in the widget
-- the column label in Grist (via `_grist_Tables_column`)
-
-The `colId` (internal identifier) remains unchanged — formulas and references are not affected.
-
-### Lock mode
-
-Enable the 🔒 lock in the ⚙️ panel to hide the settings button from read-only users. Document editors always retain access via the **⋯ → Widget options** menu.
 
 ### Setup
 
 1. In your Grist page, add a view → **Custom Widget**
-2. Enter the hosted file URL (see below)
+2. Enter the URL:  
+   `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
 3. Select access level **"Full"** (required for column renaming)
 4. Link the widget to your main table via **"Data from"**
 
@@ -129,7 +109,7 @@ Click the ⚙️ icon in the tab bar (or via ⋯ → Widget options):
 
 | Option | Description |
 |---|---|
-| **🔒 Lock** | Hides ⚙️ for read-only users |
+| **🔒 Lock** | Grays out ⚙️ for read-only users |
 | **Title column** | Column displayed in the bar (e.g. Name, Title) |
 | **Excluded columns** | Click to exclude / re-include a column |
 | **Label** | Renames the tab AND the Grist column label (on blur) |
@@ -137,13 +117,11 @@ Click the ⚙️ icon in the tab bar (or via ⋯ → Widget options):
 | **Check all / Uncheck all** | Show or hide all fields at once |
 | **⠿ Drag & drop** | Reorder tabs |
 
-### Hosting
+### Technical notes
 
-Single self-contained HTML file — no npm, no build step.
-
-* **GitHub Pages**: enable Pages on this repo (`Settings → Pages → main / root`), use:  
-  `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
-* **Any static HTTP server** (Scalingo, Netlify, public WebDAV…)
+- Column descriptions are read from `_grist_Tables_column` on first record load
+- Column renaming uses `applyUserActions` → `UpdateRecord` on `_grist_Tables_column` (label field only — `colId` is never modified)
+- Config stored in `localStorage` with key `grist_mfv_<tableId>`
 
 ---
 
@@ -152,6 +130,9 @@ Single self-contained HTML file — no npm, no build step.
 | Fichier | Description |
 |---|---|
 | `widget_multifield_viewer.html` | Widget principal / Main widget file |
+| `screenshot-tabs.png` | Capture vue onglets / Tabs view screenshot |
+| `screenshot-settings.png` | Capture panneau réglages / Settings panel screenshot |
+| `demo_critique_artistique.csv` | Table de démonstration / Demo table |
 
 ---
 
