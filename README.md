@@ -1,7 +1,7 @@
 # grist-widget-multifield-viewer
 
-> Grist custom widget — affichage des commentaires spécialistes / Specialist comments viewer.  
-> Affiche les champs texte longs d'un enregistrement avec 3 modes de rendu et des libellés personnalisables.
+> Grist custom widget — multi-field text viewer with tabs, configurable labels and tooltips auto-populated from native Grist column descriptions.  
+> Visionneur de champs texte avec onglets, libellés personnalisables et infobulles issues des descriptions natives des colonnes Grist.
 
 ---
 
@@ -9,60 +9,56 @@
 
 ### Présentation
 
-Widget personnalisé pour [Grist](https://www.getgrist.com/) qui affiche les champs texte longs d'un enregistrement sélectionné — typiquement des avis de spécialistes ou commentaires multiples — dans une interface compacte et lisible.
+Widget personnalisé pour [Grist](https://www.getgrist.com/) qui affiche les champs texte d'un enregistrement sélectionné dans une interface à onglets compacte.
 
-Conçu pour s'intégrer dans une page multi-vues : la sélection d'une ligne dans une table principale actualise automatiquement le widget.
+Conçu pour des tables contenant plusieurs champs texte longs — avis de spécialistes, commentaires multiples, notes structurées — et pour s'intégrer dans une page multi-vues : la sélection d'une ligne dans une table principale actualise automatiquement le widget.
 
 ### Fonctionnalités
 
-* **3 modes d'affichage** — Onglets, Liste accordéon, Grille 2 colonnes
-* **Onglets** — un onglet par champ, point coloré selon présence de contenu, texte complet affiché au clic
-* **Liste accordéon** — dépliage animé, badge ✓ / — par champ
-* **Grille** — aperçu compact 2 colonnes avec scroll par carte
-* **Champs configurables** — activer/désactiver chaque champ, personnaliser son libellé
-* **Options persistées** via `grist.setOption()` (mode et libellés retenus après rechargement)
+* **Vue en onglets** — un onglet par champ, point coloré selon présence de contenu, texte complet dans le panneau
+* **Colonnes dynamiques** — détectées automatiquement depuis l'enregistrement, aucune colonne codée en dur
+* **Infobulles au survol** — alimentées automatiquement depuis les **descriptions natives des colonnes Grist** (panneau colonne → Description), surchargeables manuellement
+* **Libellés personnalisables** — renommer chaque onglet sans modifier les noms de colonnes Grist
+* **Colonnes exclues** — masquer des colonnes du widget en un clic, réintégrables à tout moment
+* **Réordonnancement** — glisser-déposer pour changer l'ordre des onglets
+* **Colonne titre** — choisir la colonne affichée dans la barre (ex. nom de la personne)
+* **Options persistées** via `grist.setOption()` (configuration retenue après rechargement)
 * **Bilingue** — détection automatique FR / EN selon `navigator.language`
 * **Accessible** — rôles ARIA, navigation clavier, focus visible
+
+### Infobulles et descriptions de colonnes
+
+Le widget lit automatiquement les descriptions natives via la table interne `_grist_Tables_column`. Si une colonne possède une description (renseignée dans **Panneau colonne → Description**), elle est automatiquement utilisée comme infobulle au survol de l'onglet.
+
+Tu peux surcharger cette description dans le panneau ⚙️ — la valeur personnalisée prend le dessus et ne sera plus écrasée.
 
 ### Installation
 
 1. Dans ta page Grist, ajouter une vue → **Widget personnalisé**
-2. Dans le panneau de droite, renseigner l'URL du fichier hébergé (voir ci-dessous)
+2. Renseigner l'URL du fichier hébergé (voir ci-dessous)
 3. Sélectionner l'accès **"Lire l'enregistrement sélectionné"**
 4. Lier le widget à ta table principale via **"Données de"**
 
 ### Configuration
 
-Clique sur l'icône ⚙️ en haut à droite du widget pour :
-- Choisir le mode d'affichage (Onglets / Liste / Grille)
-- Cocher/décocher les champs à afficher
-- Renommer les libellés affichés (sans modifier les noms de colonnes Grist)
+Clique sur l'icône ⚙️ dans la barre d'onglets pour :
 
-### Colonnes attendues par défaut
-
-Le widget est préconfiguré pour les champs suivants (modifiables dans le panneau ⚙️) :
-
-| Colonne Grist | Libellé par défaut |
+| Option | Description |
 |---|---|
-| `Avis_famille_internat` | Avis famille internat |
-| `Avis_famille_apprentissage` | Avis famille apprentissage |
-| `Motivation_de_l_eleve_et_de_sa_famille` | Motivation élève & famille |
-| `avis_de_l_enseignant_accompagnateur_du_projet_de_l_eleve` | Enseignant accompagnateur |
-| `avis_du_chef_d_etablissement_prenant_appui_sur_la_decision_du_conseil_de_classe` | Chef d'établissement |
-| `avis_du_medecin_de_l_education_nationale_si_besoin_et_dans_la_mesure_du_possible` | Médecin EN |
-| `avis_des_partenaires_de_soin_esms_sessad_etc_nom_et_fonction` | Partenaires de soin |
-| `situation_particuliere` | Situation particulière |
-| `commentaires` | Commentaires |
-
-> Ces colonnes correspondent à un formulaire Démarches Numériques (procédure 131937). Adapte-les à ta propre table via le panneau de réglages.
+| **Colonne titre** | Colonne affichée dans la barre (ex. Nom, Titre) |
+| **Colonnes exclues** | Clic pour exclure / réintégrer une colonne |
+| **Libellé** | Renommer l'onglet affiché |
+| **Infobulle** | Texte au survol (pré-rempli depuis la description Grist si disponible) |
+| **Tout cocher / décocher** | Afficher ou masquer tous les champs en un clic |
+| **⠿ Glisser-déposer** | Réordonner les onglets |
 
 ### Hébergement
 
-Le widget est un fichier HTML autonome, sans dépendance npm ni étape de build.
+Fichier HTML autonome, sans dépendance npm ni étape de build.
 
-* **GitHub Pages** : activer Pages sur ce dépôt, utiliser l'URL  
-  `https://<user>.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
-* **Tout serveur HTTP statique** (Scalingo, Netlify, serveur WebDAV public…)
+* **GitHub Pages** : activer Pages sur ce dépôt (`Settings → Pages → main / root`), utiliser :  
+  `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
+* **Tout serveur HTTP statique** (Scalingo, Netlify, WebDAV public…)
 
 ---
 
@@ -70,41 +66,55 @@ Le widget est un fichier HTML autonome, sans dépendance npm ni étape de build.
 
 ### Overview
 
-A Grist custom widget that displays long text fields from a selected record — typically specialist opinions or multiple comments — in a compact, readable interface.
+A Grist custom widget that displays text fields from a selected record in a compact tabbed interface.
 
-Designed for multi-view pages: selecting a row in the main table automatically updates the widget.
+Designed for tables with multiple long text fields — specialist opinions, structured notes, multiple comments — and for multi-view pages: selecting a row in the main table automatically updates the widget.
 
 ### Features
 
-* **3 display modes** — Tabs, Accordion list, 2-column Grid
-* **Tabs** — one tab per field, colored dot indicating content presence, full text on click
-* **Accordion list** — animated expand/collapse, ✓ / — badge per field
-* **Grid** — compact 2-column preview with per-card scrolling
-* **Configurable fields** — enable/disable each field, customize its label
-* **Persisted options** via `grist.setOption()` (mode and labels survive page reload)
+* **Tabs view** — one tab per field, colored dot indicating content presence, full text in the panel
+* **Dynamic columns** — auto-detected from the record, no hardcoded column names
+* **Hover tooltips** — auto-populated from **native Grist column descriptions** (column panel → Description), manually overridable
+* **Customizable labels** — rename tabs without changing Grist column names
+* **Excluded columns** — hide columns from the widget in one click, re-includable at any time
+* **Reordering** — drag and drop to change tab order
+* **Title column** — choose which column is displayed in the tab bar
+* **Persisted options** via `grist.setOption()` (configuration survives page reload)
 * **Bilingual** — automatic FR / EN detection via `navigator.language`
 * **Accessible** — ARIA roles, keyboard navigation, visible focus
+
+### Tooltips and column descriptions
+
+The widget automatically reads native column descriptions from Grist's internal `_grist_Tables_column` table. If a column has a description (set in **Column panel → Description**), it is automatically used as the hover tooltip on the tab.
+
+You can override this in the widget's ⚙️ panel — the custom value takes precedence and will no longer be overwritten.
 
 ### Setup
 
 1. In your Grist page, add a view → **Custom Widget**
-2. In the right panel, enter the hosted file URL (see below)
+2. Enter the hosted file URL (see below)
 3. Select access level **"Read selected record"**
 4. Link the widget to your main table via **"Data from"**
 
 ### Configuration
 
-Click the ⚙️ icon in the widget's top-right corner to:
-- Choose the display mode (Tabs / List / Grid)
-- Toggle fields on/off
-- Rename labels (without changing Grist column names)
+Click the ⚙️ icon in the tab bar to configure:
+
+| Option | Description |
+|---|---|
+| **Title column** | Column displayed in the bar (e.g. Name, Title) |
+| **Excluded columns** | Click to exclude / re-include a column |
+| **Label** | Rename the displayed tab |
+| **Tooltip** | Hover text (pre-filled with native Grist description if available) |
+| **Check all / Uncheck all** | Show or hide all fields at once |
+| **⠿ Drag & drop** | Reorder tabs |
 
 ### Hosting
 
 Single self-contained HTML file — no npm, no build step.
 
-* **GitHub Pages**: enable Pages on this repo, use  
-  `https://<user>.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
+* **GitHub Pages**: enable Pages on this repo (`Settings → Pages → main / root`), use:  
+  `https://maximelacoste.github.io/grist-widget-multifield-viewer/widget_multifield_viewer.html`
 * **Any static HTTP server** (Scalingo, Netlify, public WebDAV…)
 
 ---
