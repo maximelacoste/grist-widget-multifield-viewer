@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Commentaires spécialistes — Grist widget</title>
+  <title>Multifield Viewer — Grist widget</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -38,14 +38,14 @@
     .toolbar {
       display: flex; align-items: center; gap: 8px; padding: 7px 10px;
       background: var(--surface); border-bottom: 1px solid var(--border);
-      flex-shrink: 0; flex-wrap: wrap; min-height: 36px;
+      flex-shrink: 0; min-height: 36px;
     }
     .toolbar-title {
       font-size: 12px; font-weight: 600; color: var(--text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
     }
     .toolbar-title.empty { font-style: italic; color: var(--muted); font-weight: 400; }
-    .toolbar-right { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+    .toolbar-right { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
     .toolbar-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
 
     .btn-icon {
@@ -63,7 +63,7 @@
     .settings-panel {
       display: none; flex-direction: column; gap: 12px; padding: 10px 14px;
       background: var(--surface); border-bottom: 2px solid var(--accent);
-      flex-shrink: 0; max-height: 50vh; overflow-y: auto;
+      flex-shrink: 0; max-height: 55vh; overflow-y: auto;
       scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg);
     }
     .settings-panel.open { display: flex; }
@@ -84,10 +84,25 @@
     .mode-btn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
     .mode-btn:focus-visible { box-shadow: var(--focus-ring); }
 
+    /* Colonnes exclues */
+    .excluded-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+    .excl-tag {
+      font-family: var(--mono); font-size: 10px; padding: 2px 7px;
+      border: 1px solid var(--border-strong); border-radius: 10px;
+      background: var(--bg); color: var(--muted); cursor: pointer;
+      transition: background .1s, color .1s;
+    }
+    .excl-tag:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .excl-tag:focus-visible { box-shadow: var(--focus-ring); }
+
+    /* Liste champs */
     .fields-list { display: flex; flex-direction: column; gap: 3px; }
     .field-cfg-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
     .field-cfg-row input[type="checkbox"] {
       accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; flex-shrink: 0;
+    }
+    .field-cfg-handle {
+      color: var(--muted); cursor: grab; font-size: 11px; flex-shrink: 0; user-select: none;
     }
     .field-cfg-colname {
       font-family: var(--mono); font-size: 10px; color: var(--muted);
@@ -96,9 +111,18 @@
     .field-cfg-input {
       font-family: var(--font); font-size: 11px; padding: 2px 6px;
       border: 1px solid var(--border-strong); border-radius: var(--radius);
-      color: var(--text); background: var(--bg); outline: none; max-width: 200px; flex: 1.5;
+      color: var(--text); background: var(--bg); outline: none; width: 160px; flex-shrink: 0;
     }
     .field-cfg-input:focus { border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+    .btn-small {
+      font-family: var(--font); font-size: 10px; padding: 2px 7px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      background: var(--bg); color: var(--muted); cursor: pointer; outline: none;
+      white-space: nowrap; transition: background .1s, color .1s;
+    }
+    .btn-small:hover { color: var(--text); border-color: var(--muted); }
+    .btn-small:focus-visible { box-shadow: var(--focus-ring); }
 
     /* ── Contenu ── */
     .content {
@@ -133,20 +157,11 @@
       transition: background .1s, color .1s; white-space: nowrap; position: relative; top: 1px;
     }
     .tab-btn:hover { background: var(--hover); color: var(--text); }
-    .tab-btn.active {
-      background: var(--surface); color: var(--text);
-      border-color: var(--border); border-bottom-color: var(--surface); z-index: 1;
-    }
+    .tab-btn.active { background: var(--surface); color: var(--text); border-color: var(--border); border-bottom-color: var(--surface); z-index: 1; }
     .tab-btn.tab-empty { opacity: .45; }
     .tab-btn:focus-visible { box-shadow: var(--focus-ring); }
-    .tab-dot {
-      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-      margin-right: 5px; background: currentColor; opacity: .5;
-    }
-    .tab-panel {
-      flex: 1; min-height: 0; overflow-y: auto; padding: 14px;
-      scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg);
-    }
+    .tab-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; background: currentColor; opacity: .5; }
+    .tab-panel { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg); }
     .tab-panel::-webkit-scrollbar { width: 8px; }
     .tab-panel::-webkit-scrollbar-track { background: var(--bg); }
     .tab-panel::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; border: 2px solid var(--bg); }
@@ -157,55 +172,25 @@
     .list-wrapper { display: flex; flex-direction: column; }
     .list-item { border-bottom: 1px solid var(--border); background: var(--surface); }
     .list-item:last-child { border-bottom: none; }
-    .list-item-header {
-      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-      cursor: pointer; user-select: none; outline: none; transition: background .1s;
-    }
+    .list-item-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; outline: none; transition: background .1s; }
     .list-item-header:hover { background: var(--hover); }
     .list-item-header:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-    .list-chevron {
-      width: 14px; height: 14px; flex-shrink: 0; color: var(--muted);
-      transition: transform .2s;
-    }
+    .list-chevron { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); transition: transform .2s; }
     .list-item.open .list-chevron { transform: rotate(90deg); }
     .list-item-label { font-size: 12px; font-weight: 600; flex: 1; color: var(--text); }
-    .list-item-badge {
-      font-family: var(--mono); font-size: 10px; padding: 1px 6px;
-      border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
-      color: var(--muted); flex-shrink: 0;
-    }
+    .list-item-badge { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); flex-shrink: 0; }
     .list-item-badge.has-content { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
-    .list-item-body {
-      display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s;
-    }
+    .list-item-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s; }
     .list-item.open .list-item-body { grid-template-rows: 1fr; border-top: 1px solid var(--border); }
     .list-item-body-inner { overflow: hidden; }
-    .list-item-body-text {
-      padding: 10px 14px 12px 34px;
-      font-size: 13px; line-height: 1.7; white-space: pre-wrap; color: var(--text);
-    }
-    .list-item-body-empty {
-      padding: 10px 14px 12px 34px;
-      font-size: 12px; color: var(--muted); font-style: italic;
-    }
+    .list-item-body-text { padding: 10px 14px 12px 34px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; color: var(--text); }
+    .list-item-body-empty { padding: 10px 14px 12px 34px; font-size: 12px; color: var(--muted); font-style: italic; }
 
     /* ── Mode GRILLE ── */
-    .grid-wrapper {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;
-    }
-    .grid-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
-    }
-    .grid-card-header {
-      padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--border);
-      font-size: 11px; font-weight: 600; color: var(--muted);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .grid-card-body {
-      padding: 8px 10px; font-size: 12px; line-height: 1.6;
-      white-space: pre-wrap; color: var(--text); max-height: 120px; overflow-y: auto;
-    }
+    .grid-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+    .grid-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .grid-card-header { padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .grid-card-body { padding: 8px 10px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--text); max-height: 120px; overflow-y: auto; }
     .grid-card-body.empty { color: var(--muted); font-style: italic; }
   </style>
 </head>
@@ -236,14 +221,35 @@
   </header>
 
   <div class="settings-panel" id="settings-panel">
+
     <div>
       <p class="setting-section-title">Mode d'affichage</p>
       <div class="display-mode-row" id="mode-row" role="radiogroup" aria-label="Mode d'affichage"></div>
     </div>
+
     <div>
-      <p class="setting-section-title">Champs affichés &amp; libellés</p>
+      <p class="setting-section-title">Colonne titre (toolbar)</p>
+      <select id="title-col-select" style="font-family:var(--font);font-size:12px;padding:3px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none;max-width:220px;">
+        <option value="">— aucune —</option>
+      </select>
+    </div>
+
+    <div>
+      <p class="setting-section-title">Colonnes exclues (non-texte)</p>
+      <div class="excluded-row" id="excluded-row">
+        <span style="font-size:11px;color:var(--muted);font-style:italic">Cliquez sur une colonne pour l'exclure du panneau ci-dessous.</span>
+      </div>
+    </div>
+
+    <div>
+      <p class="setting-section-title" style="margin-bottom:6px">
+        Champs affichés &amp; libellés
+        <button class="btn-small" id="btn-check-all" type="button" style="margin-left:8px">Tout cocher</button>
+        <button class="btn-small" id="btn-uncheck-all" type="button" style="margin-left:4px">Tout décocher</button>
+      </p>
       <div class="fields-list" id="fields-list"></div>
     </div>
+
   </div>
 
   <main class="content" id="content"></main>
@@ -256,53 +262,77 @@
 const LANG = (navigator.language || 'fr').startsWith('fr') ? 'fr' : 'en';
 const T = {
   fr: {
-    noRecord: 'Sélectionnez un élève dans la table.',
+    noRecord:    'Sélectionnez un enregistrement dans la table.',
     noRecordSub: 'Le contenu s\'affichera ici.',
-    emptyField: '(aucun contenu)',
-    modeTab: 'Onglets', modeList: 'Liste', modeGrid: 'Grille',
+    noFields:    'Aucun champ texte détecté.',
+    noFieldsSub: 'Configurez les champs à afficher via ⚙️',
+    emptyField:  '(aucun contenu)',
+    modeTab:  'Onglets', modeList: 'Liste', modeGrid: 'Grille',
   },
   en: {
-    noRecord: 'Select a student in the table.',
+    noRecord:    'Select a record in the table.',
     noRecordSub: 'Content will appear here.',
-    emptyField: '(no content)',
-    modeTab: 'Tabs', modeList: 'List', modeGrid: 'Grid',
+    noFields:    'No text fields detected.',
+    noFieldsSub: 'Configure fields to display via ⚙️',
+    emptyField:  '(no content)',
+    modeTab:  'Tabs', modeList: 'List', modeGrid: 'Grid',
   }
 }[LANG];
 
-// ══════════════════════════════════════════
-// CHAMPS PAR DÉFAUT
-// ══════════════════════════════════════════
-const DEFAULT_FIELDS = [
-  { col: 'Avis_famille_internat',                                                            label: 'Avis famille internat',      visible: true },
-  { col: 'Avis_famille_apprentissage',                                                       label: 'Avis famille apprentissage', visible: true },
-  { col: 'Motivation_de_l_eleve_et_de_sa_famille',                                           label: 'Motivation élève & famille', visible: true },
-  { col: 'avis_de_l_enseignant_accompagnateur_du_projet_de_l_eleve',                         label: 'Enseignant accompagnateur',  visible: true },
-  { col: 'avis_du_chef_d_etablissement_prenant_appui_sur_la_decision_du_conseil_de_classe',  label: 'Chef d\'établissement',      visible: true },
-  { col: 'avis_du_medecin_de_l_education_nationale_si_besoin_et_dans_la_mesure_du_possible', label: 'Médecin EN',                 visible: true },
-  { col: 'avis_des_partenaires_de_soin_esms_sessad_etc_nom_et_fonction',                     label: 'Partenaires de soin',        visible: true },
-  { col: 'situation_particuliere',                                                            label: 'Situation particulière',     visible: true },
-  { col: 'commentaires',                                                                      label: 'Commentaires',               visible: true },
-];
+// Colonnes système à toujours ignorer
+const SYSTEM_COLS = new Set(['id', 'manualSort']);
 
 const DISPLAY_MODES = ['tab', 'list', 'grid'];
 
 // ══════════════════════════════════════════
 // ÉTAT
 // ══════════════════════════════════════════
-let fields      = JSON.parse(JSON.stringify(DEFAULT_FIELDS));
-let displayMode = 'tab';
+let allCols      = [];       // toutes les colonnes du record (hors système)
+let excludedCols = new Set();// colonnes volontairement exclues du widget
+let fields       = [];       // [{ col, label, visible }] — ordre + config
+let displayMode  = 'tab';
+let titleCol     = '';       // colonne utilisée pour le titre toolbar
 let currentRecord = null;
-let activeTab   = 0;
+let activeTab    = 0;
 
 // ══════════════════════════════════════════
 // DOM
 // ══════════════════════════════════════════
-const btnSettings   = document.getElementById('btn-settings');
-const settingsPanel = document.getElementById('settings-panel');
-const content       = document.getElementById('content');
-const toolbarTitle  = document.getElementById('toolbar-title');
-const modeRow       = document.getElementById('mode-row');
-const fieldsList    = document.getElementById('fields-list');
+const btnSettings    = document.getElementById('btn-settings');
+const settingsPanel  = document.getElementById('settings-panel');
+const content        = document.getElementById('content');
+const toolbarTitle   = document.getElementById('toolbar-title');
+const modeRow        = document.getElementById('mode-row');
+const fieldsList     = document.getElementById('fields-list');
+const excludedRow    = document.getElementById('excluded-row');
+const titleColSelect = document.getElementById('title-col-select');
+
+// ══════════════════════════════════════════
+// INIT COLONNES depuis un record
+// ══════════════════════════════════════════
+function initColsFromRecord(record) {
+  const detected = Object.keys(record).filter(k => !SYSTEM_COLS.has(k));
+
+  // Nouvelles colonnes non encore connues → on les ajoute
+  detected.forEach(col => {
+    if (!allCols.includes(col)) allCols.push(col);
+  });
+
+  // Colonnes dans fields mais disparues → on les retire
+  allCols = allCols.filter(c => detected.includes(c));
+
+  // Rebuild fields : garder l'ordre et les labels/visible existants,
+  // ajouter les nouvelles colonnes non exclues
+  const existingCols = new Set(fields.map(f => f.col));
+  allCols.forEach(col => {
+    if (!existingCols.has(col) && !excludedCols.has(col)) {
+      fields.push({ col, label: col, visible: true });
+    }
+  });
+
+  // Retirer les colonnes devenues exclues
+  fields = fields.filter(f => !excludedCols.has(f.col));
+}
 
 // ══════════════════════════════════════════
 // PANNEAU RÉGLAGES
@@ -311,9 +341,17 @@ btnSettings.addEventListener('click', () => {
   const isOpen = settingsPanel.classList.toggle('open');
   btnSettings.classList.toggle('active', isOpen);
   btnSettings.setAttribute('aria-expanded', String(isOpen));
-  if (isOpen) { buildModeButtons(); buildFieldsList(); }
+  if (isOpen) { buildSettings(); }
 });
 
+function buildSettings() {
+  buildModeButtons();
+  buildTitleColSelect();
+  buildExcludedRow();
+  buildFieldsList();
+}
+
+// ── Modes ──
 function buildModeButtons() {
   modeRow.innerHTML = '';
   const labels = { tab: T.modeTab, list: T.modeList, grid: T.modeGrid };
@@ -326,64 +364,173 @@ function buildModeButtons() {
     btn.textContent = labels[mode];
     btn.addEventListener('click', () => {
       displayMode = mode;
-      modeRow.querySelectorAll('.mode-btn').forEach(b => {
-        b.classList.remove('selected'); b.setAttribute('aria-checked', 'false');
-      });
+      modeRow.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('selected'); b.setAttribute('aria-checked', 'false'); });
       btn.classList.add('selected'); btn.setAttribute('aria-checked', 'true');
-      grist.setOption('displayMode', displayMode);
-      render();
+      saveOptions(); render();
     });
     modeRow.appendChild(btn);
   });
 }
 
+// ── Colonne titre ──
+function buildTitleColSelect() {
+  titleColSelect.innerHTML = '<option value="">— aucune —</option>';
+  allCols.forEach(col => {
+    const opt = document.createElement('option');
+    opt.value = col; opt.textContent = col;
+    if (col === titleCol) opt.selected = true;
+    titleColSelect.appendChild(opt);
+  });
+}
+titleColSelect.addEventListener('change', () => {
+  titleCol = titleColSelect.value;
+  saveOptions();
+  updateToolbarTitle();
+});
+
+// ── Colonnes exclues ──
+function buildExcludedRow() {
+  excludedRow.innerHTML = '';
+  if (allCols.length === 0) {
+    excludedRow.innerHTML = '<span style="font-size:11px;color:var(--muted);font-style:italic">Aucune colonne détectée.</span>';
+    return;
+  }
+  // Colonnes non exclues = cliquables pour les exclure
+  const activeColsInPanel = fields.map(f => f.col);
+  activeColsInPanel.forEach(col => {
+    const tag = document.createElement('button');
+    tag.type = 'button'; tag.className = 'excl-tag';
+    tag.textContent = col; tag.title = 'Cliquer pour exclure';
+    tag.addEventListener('click', () => {
+      excludedCols.add(col);
+      fields = fields.filter(f => f.col !== col);
+      saveOptions(); buildSettings(); render();
+    });
+    excludedRow.appendChild(tag);
+  });
+  // Colonnes déjà exclues = affichées avec style différent pour pouvoir les réintégrer
+  excludedCols.forEach(col => {
+    const tag = document.createElement('button');
+    tag.type = 'button'; tag.className = 'excl-tag';
+    tag.style.cssText = 'background:#fee2e2;border-color:#fca5a5;color:#b91c1c;';
+    tag.textContent = '↩ ' + col; tag.title = 'Cliquer pour réintégrer';
+    tag.addEventListener('click', () => {
+      excludedCols.delete(col);
+      if (!fields.find(f => f.col === col)) fields.push({ col, label: col, visible: true });
+      saveOptions(); buildSettings(); render();
+    });
+    excludedRow.appendChild(tag);
+  });
+}
+
+// ── Liste des champs ──
 function buildFieldsList() {
   fieldsList.innerHTML = '';
   fields.forEach((f, i) => {
     const row = document.createElement('div');
     row.className = 'field-cfg-row';
+    row.draggable = true;
+    row.dataset.idx = i;
 
     const chk = document.createElement('input');
     chk.type = 'checkbox'; chk.checked = f.visible;
     chk.setAttribute('aria-label', 'Afficher ' + f.col);
-    chk.addEventListener('change', () => { fields[i].visible = chk.checked; saveFields(); render(); });
+    chk.addEventListener('change', () => { fields[i].visible = chk.checked; saveOptions(); render(); });
+
+    const handle = document.createElement('span');
+    handle.className = 'field-cfg-handle'; handle.textContent = '⠿'; handle.title = 'Glisser pour réordonner';
 
     const colName = document.createElement('span');
-    colName.className = 'field-cfg-colname';
-    colName.textContent = f.col; colName.title = f.col;
+    colName.className = 'field-cfg-colname'; colName.textContent = f.col; colName.title = f.col;
 
     const inp = document.createElement('input');
     inp.type = 'text'; inp.className = 'field-cfg-input';
     inp.value = f.label; inp.placeholder = f.col;
-    inp.addEventListener('input', () => { fields[i].label = inp.value || f.col; saveFields(); render(); });
+    inp.addEventListener('input', () => { fields[i].label = inp.value || f.col; saveOptions(); render(); });
 
-    row.appendChild(chk); row.appendChild(colName); row.appendChild(inp);
+    row.appendChild(chk); row.appendChild(handle); row.appendChild(colName); row.appendChild(inp);
     fieldsList.appendChild(row);
+  });
+
+  // Drag & drop pour réordonner
+  let dragIdx = null;
+  fieldsList.querySelectorAll('.field-cfg-row').forEach(row => {
+    row.addEventListener('dragstart', e => { dragIdx = parseInt(row.dataset.idx); e.dataTransfer.effectAllowed = 'move'; row.style.opacity = '.4'; });
+    row.addEventListener('dragend',   e => { row.style.opacity = ''; dragIdx = null; });
+    row.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      const dropIdx = parseInt(row.dataset.idx);
+      if (dragIdx === null || dragIdx === dropIdx) return;
+      const moved = fields.splice(dragIdx, 1)[0];
+      fields.splice(dropIdx, 0, moved);
+      saveOptions(); buildFieldsList(); render();
+    });
   });
 }
 
-function saveFields() {
-  grist.setOption('fields', JSON.stringify(fields));
+// ── Tout cocher / décocher ──
+document.getElementById('btn-check-all').addEventListener('click', () => {
+  fields.forEach(f => f.visible = true); saveOptions(); buildFieldsList(); render();
+});
+document.getElementById('btn-uncheck-all').addEventListener('click', () => {
+  fields.forEach(f => f.visible = false); saveOptions(); buildFieldsList(); render();
+});
+
+// ══════════════════════════════════════════
+// PERSISTANCE
+// ══════════════════════════════════════════
+function saveOptions() {
+  grist.setOption('displayMode',   displayMode);
+  grist.setOption('titleCol',      titleCol);
+  grist.setOption('excludedCols',  JSON.stringify([...excludedCols]));
+  grist.setOption('fields',        JSON.stringify(fields));
+}
+
+function loadOptions(opts) {
+  if (!opts) return;
+  if (opts.displayMode && DISPLAY_MODES.includes(opts.displayMode)) displayMode = opts.displayMode;
+  if (opts.titleCol !== undefined) titleCol = opts.titleCol;
+  if (opts.excludedCols) { try { excludedCols = new Set(JSON.parse(opts.excludedCols)); } catch(e) {} }
+  if (opts.fields) { try { fields = JSON.parse(opts.fields); } catch(e) {} }
+}
+
+// ══════════════════════════════════════════
+// TOOLBAR TITRE
+// ══════════════════════════════════════════
+function updateToolbarTitle() {
+  if (!currentRecord) { toolbarTitle.textContent = ''; toolbarTitle.className = 'toolbar-title empty'; return; }
+  const val = titleCol ? (currentRecord[titleCol] || '').toString().trim() : '';
+  toolbarTitle.textContent = val || '—';
+  toolbarTitle.className = 'toolbar-title' + (val ? '' : ' empty');
 }
 
 // ══════════════════════════════════════════
 // RENDU
 // ══════════════════════════════════════════
 function render() {
+  updateToolbarTitle();
   if (!currentRecord) {
-    content.innerHTML = `
-      <div class="empty">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        <p class="empty-title">${T.noRecord}</p>
-        <p class="empty-sub">${T.noRecordSub}</p>
-      </div>`;
-    toolbarTitle.textContent = '';
-    toolbarTitle.className = 'toolbar-title empty';
+    content.innerHTML = `<div class="empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <p class="empty-title">${T.noRecord}</p>
+      <p class="empty-sub">${T.noRecordSub}</p>
+    </div>`;
     return;
   }
   const visible = fields.filter(f => f.visible);
+  if (visible.length === 0) {
+    content.innerHTML = `<div class="empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M9 21V9"/>
+      </svg>
+      <p class="empty-title">${T.noFields}</p>
+      <p class="empty-sub">${T.noFieldsSub}</p>
+    </div>`;
+    return;
+  }
   if (displayMode === 'tab')  renderTabs(visible);
   if (displayMode === 'list') renderList(visible);
   if (displayMode === 'grid') renderGrid(visible);
@@ -392,124 +539,83 @@ function render() {
 // ── Onglets ──
 function renderTabs(visible) {
   if (activeTab >= visible.length) activeTab = 0;
-  const wrapper = document.createElement('div');
-  wrapper.className = 'tabs-wrapper';
-
-  const bar = document.createElement('div');
-  bar.className = 'tabs-bar';
-  bar.setAttribute('role', 'tablist');
+  const wrapper = document.createElement('div'); wrapper.className = 'tabs-wrapper';
+  const bar = document.createElement('div'); bar.className = 'tabs-bar'; bar.setAttribute('role', 'tablist');
 
   visible.forEach((f, i) => {
-    const val = (currentRecord[f.col] || '').toString().trim();
+    const val = toString(currentRecord[f.col]);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'tab-btn' + (i === activeTab ? ' active' : '') + (!val ? ' tab-empty' : '');
-    btn.setAttribute('role', 'tab');
-    btn.setAttribute('aria-selected', String(i === activeTab));
-
-    const dot = document.createElement('span');
-    dot.className = 'tab-dot';
+    btn.setAttribute('role', 'tab'); btn.setAttribute('aria-selected', String(i === activeTab));
+    const dot = document.createElement('span'); dot.className = 'tab-dot';
     dot.style.background = val ? 'var(--accent)' : 'var(--muted)';
-    btn.appendChild(dot);
-    btn.appendChild(document.createTextNode(f.label));
+    btn.appendChild(dot); btn.appendChild(document.createTextNode(f.label));
     btn.addEventListener('click', () => { activeTab = i; render(); });
     bar.appendChild(btn);
   });
 
-  const panel = document.createElement('div');
-  panel.className = 'tab-panel';
-  panel.setAttribute('role', 'tabpanel');
+  const panel = document.createElement('div'); panel.className = 'tab-panel'; panel.setAttribute('role', 'tabpanel');
   const active = visible[activeTab] || visible[0];
-  const val = active ? (currentRecord[active.col] || '').toString().trim() : '';
-  const p = document.createElement('p');
-  p.className = val ? 'tab-content-text' : 'tab-content-empty';
-  p.textContent = val || T.emptyField;
-  panel.appendChild(p);
-
-  wrapper.appendChild(bar);
-  wrapper.appendChild(panel);
-  content.innerHTML = '';
-  content.appendChild(wrapper);
+  const val = active ? toString(currentRecord[active.col]) : '';
+  const p = document.createElement('p'); p.className = val ? 'tab-content-text' : 'tab-content-empty'; p.textContent = val || T.emptyField;
+  panel.appendChild(p); wrapper.appendChild(bar); wrapper.appendChild(panel);
+  content.innerHTML = ''; content.appendChild(wrapper);
 }
 
-// ── Liste accordéon ──
+// ── Liste ──
 function renderList(visible) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'list-wrapper';
-
+  const wrapper = document.createElement('div'); wrapper.className = 'list-wrapper';
   visible.forEach(f => {
-    const val = (currentRecord[f.col] || '').toString().trim();
-    const item = document.createElement('div');
-    item.className = 'list-item';
-
+    const val = toString(currentRecord[f.col]);
+    const item = document.createElement('div'); item.className = 'list-item';
     const header = document.createElement('div');
-    header.className = 'list-item-header';
-    header.setAttribute('role', 'button'); header.setAttribute('tabindex', '0');
-    header.setAttribute('aria-expanded', 'false');
+    header.className = 'list-item-header'; header.setAttribute('role', 'button'); header.setAttribute('tabindex', '0'); header.setAttribute('aria-expanded', 'false');
 
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('class', 'list-chevron'); svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
-    svg.setAttribute('stroke-width', '2.5'); svg.setAttribute('aria-hidden', 'true');
-    const poly = document.createElementNS(svgNS, 'polyline');
-    poly.setAttribute('points', '9 6 15 12 9 18');
-    svg.appendChild(poly);
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2.5'); svg.setAttribute('aria-hidden', 'true');
+    const poly = document.createElementNS(svgNS, 'polyline'); poly.setAttribute('points', '9 6 15 12 9 18'); svg.appendChild(poly);
 
-    const label = document.createElement('span');
-    label.className = 'list-item-label'; label.textContent = f.label;
-
-    const badge = document.createElement('span');
-    badge.className = 'list-item-badge' + (val ? ' has-content' : '');
-    badge.textContent = val ? '✓' : '—';
-
+    const label = document.createElement('span'); label.className = 'list-item-label'; label.textContent = f.label;
+    const badge = document.createElement('span'); badge.className = 'list-item-badge' + (val ? ' has-content' : ''); badge.textContent = val ? '✓' : '—';
     header.appendChild(svg); header.appendChild(label); header.appendChild(badge);
 
-    const body = document.createElement('div');
-    body.className = 'list-item-body';
-    const inner = document.createElement('div');
-    inner.className = 'list-item-body-inner';
-    const txt = document.createElement('p');
-    txt.className = val ? 'list-item-body-text' : 'list-item-body-empty';
-    txt.textContent = val || T.emptyField;
+    const body = document.createElement('div'); body.className = 'list-item-body';
+    const inner = document.createElement('div'); inner.className = 'list-item-body-inner';
+    const txt = document.createElement('p'); txt.className = val ? 'list-item-body-text' : 'list-item-body-empty'; txt.textContent = val || T.emptyField;
     inner.appendChild(txt); body.appendChild(inner);
 
-    const toggle = () => {
-      const isOpen = item.classList.toggle('open');
-      header.setAttribute('aria-expanded', String(isOpen));
-    };
+    const toggle = () => { const o = item.classList.toggle('open'); header.setAttribute('aria-expanded', String(o)); };
     header.addEventListener('click', toggle);
     header.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
-
-    item.appendChild(header); item.appendChild(body);
-    wrapper.appendChild(item);
+    item.appendChild(header); item.appendChild(body); wrapper.appendChild(item);
   });
-
   content.innerHTML = ''; content.appendChild(wrapper);
 }
 
 // ── Grille ──
 function renderGrid(visible) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'grid-wrapper';
-
+  const wrapper = document.createElement('div'); wrapper.className = 'grid-wrapper';
   visible.forEach(f => {
-    const val = (currentRecord[f.col] || '').toString().trim();
-    const card = document.createElement('div');
-    card.className = 'grid-card';
-
-    const head = document.createElement('div');
-    head.className = 'grid-card-header'; head.textContent = f.label; head.title = f.label;
-
-    const body = document.createElement('div');
-    body.className = 'grid-card-body' + (val ? '' : ' empty');
-    body.textContent = val || T.emptyField;
-
-    card.appendChild(head); card.appendChild(body);
-    wrapper.appendChild(card);
+    const val = toString(currentRecord[f.col]);
+    const card = document.createElement('div'); card.className = 'grid-card';
+    const head = document.createElement('div'); head.className = 'grid-card-header'; head.textContent = f.label; head.title = f.label;
+    const body = document.createElement('div'); body.className = 'grid-card-body' + (val ? '' : ' empty'); body.textContent = val || T.emptyField;
+    card.appendChild(head); card.appendChild(body); wrapper.appendChild(card);
   });
-
   content.innerHTML = ''; content.appendChild(wrapper);
+}
+
+// ══════════════════════════════════════════
+// UTILITAIRES
+// ══════════════════════════════════════════
+function toString(val) {
+  if (val == null || val === '') return '';
+  if (typeof val === 'boolean') return val ? 'true' : 'false';
+  if (Array.isArray(val)) return val.join(', ');
+  return String(val).trim();
 }
 
 // ══════════════════════════════════════════
@@ -518,30 +624,22 @@ function renderGrid(visible) {
 grist.ready({ requiredAccess: 'read table' });
 
 grist.onOptions(opts => {
-  if (opts) {
-    if (opts.displayMode && DISPLAY_MODES.includes(opts.displayMode))
-      displayMode = opts.displayMode;
-    if (opts.fields) {
-      try {
-        const saved = JSON.parse(opts.fields);
-        fields = DEFAULT_FIELDS.map(def => {
-          const s = saved.find(x => x.col === def.col);
-          return s ? { ...def, label: s.label, visible: s.visible } : def;
-        });
-        saved.forEach(s => { if (!fields.find(f => f.col === s.col)) fields.push(s); });
-      } catch(e) {}
-    }
-  }
+  loadOptions(opts);
   render();
 });
 
 grist.onRecord(record => {
   currentRecord = record;
-  const name = [record.Prenom, record.Nom, record.prenom, record.nom, record.name]
-    .filter(Boolean).join(' ').trim();
-  toolbarTitle.textContent = name || '—';
-  toolbarTitle.className = 'toolbar-title' + (name ? '' : ' empty');
+  initColsFromRecord(record);
+  // Si pas encore de fields configurés, on les initialise tous visibles
+  if (fields.length === 0) {
+    fields = allCols
+      .filter(c => !excludedCols.has(c))
+      .map(col => ({ col, label: col, visible: true }));
+  }
   render();
+  // Mettre à jour le panneau si ouvert
+  if (settingsPanel.classList.contains('open')) buildSettings();
 });
 </script>
 </body>
