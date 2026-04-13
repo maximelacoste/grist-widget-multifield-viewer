@@ -522,30 +522,20 @@ function appendSettingsBtn() {
 }
 
 // ══════════════════════════════════════════
-// PERSISTANCE — localStorage (pas de barre "Enregistrer" Grist)
+// PERSISTANCE — grist.setOption (config dans le document)
 // ══════════════════════════════════════════
-let storageKey = 'grist_mfv_default';
-
 function saveOptions() {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify({
-      titleCol,
-      locked,
-      excludedCols: [...excludedCols],
-      fields,
-    }));
-  } catch(e) {}
+  grist.setOption('mfvConfig', JSON.stringify({ titleCol, locked, excludedCols: [...excludedCols], fields }));
 }
 
-function loadOptions() {
+function loadOptions(opts) {
+  if (!opts || !opts.mfvConfig) return;
   try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return;
-    const opts = JSON.parse(raw);
-    if (opts.titleCol !== undefined)  titleCol = opts.titleCol;
-    if (opts.locked !== undefined)    locked   = opts.locked;
-    if (opts.excludedCols)            excludedCols = new Set(opts.excludedCols);
-    if (opts.fields)                  fields   = opts.fields;
+    const data = JSON.parse(opts.mfvConfig);
+    if (data.titleCol !== undefined)  titleCol    = data.titleCol;
+    if (data.locked !== undefined)    locked      = data.locked;
+    if (data.excludedCols)            excludedCols = new Set(data.excludedCols);
+    if (data.fields)                  fields      = data.fields;
   } catch(e) {}
 }
 
@@ -563,31 +553,39 @@ function toString(val) {
 // GRIST
 // ══════════════════════════════════════════
 let colDescriptions = {};
-let colMetaRowIds   = {}; // { colId: rowId dans _grist_Tables_column }
+let colRowIdMap     = {}; // { colId: rowId }
+let rowColIdMap     = {}; // { rowId: colId }
 
 async function fetchColMeta() {
   try {
     const meta = await grist.docApi.fetchTable('_grist_Tables_column');
-    if (meta && meta.colId) {
-      meta.colId.forEach((colId, i) => {
-        const desc = (meta.description[i] || '').trim();
-        if (desc) colDescriptions[colId] = desc;
-        colMetaRowIds[colId] = meta.id[i];
-      });
-    }
+    if (!meta || !meta.colId) return;
+    colRowIdMap = {}; rowColIdMap = {};
+    meta.colId.forEach((colId, i) => {
+      const desc = (meta.description[i] || '').trim();
+      if (desc) colDescriptions[colId] = desc;
+      colRowIdMap[colId]        = meta.id[i];
+      rowColIdMap[meta.id[i]]   = colId;
+    });
+    // Corrige les colIds renommés dans fields via rowIds stockés
+    fields.forEach(f => {
+      if (f._rowId && rowColIdMap[f._rowId] && rowColIdMap[f._rowId] !== f.col) {
+        f.col = rowColIdMap[f._rowId];
+      }
+      // Initialise _rowId si absent
+      if (!f._rowId && colRowIdMap[f.col]) f._rowId = colRowIdMap[f.col];
+    });
   } catch(e) {}
 }
 
 async function renameGristColumn(colId, newLabel) {
   try {
-    const rowId = colMetaRowIds[colId];
+    const rowId = colRowIdMap[colId];
     if (!rowId) return;
     await grist.docApi.applyUserActions([
       ['UpdateRecord', '_grist_Tables_column', rowId, { label: newLabel }]
     ]);
-  } catch(e) {
-    console.warn('Renommage colonne Grist échoué :', e);
-  }
+  } catch(e) { console.warn('Renommage colonne Grist échoué :', e); }
 }
 
 function openSettings() {
@@ -596,36 +594,32 @@ function openSettings() {
   renderTabs();
 }
 
-grist.ready({
-  requiredAccess: 'full',
-  onEditOptions: openSettings,
-});
+grist.ready({ requiredAccess: 'full', onEditOptions: openSettings });
+
+grist.onOptions(opts => { loadOptions(opts); renderTabs(); });
 
 grist.onRecord(async record => {
   const firstRecord = !currentRecord;
   currentRecord = record;
-  if (firstRecord) {
-    const ref = document.referrer || window.location.href;
-    storageKey = 'grist_mfv_' + btoa(ref).slice(0, 24);
-    loadOptions();
-    await fetchColMeta();
-  }
+  if (firstRecord) await fetchColMeta();
+  else await fetchColMeta(); // recheck à chaque record pour détecter renommages
   initColsFromRecord(record);
+  // Initialise _rowId sur les nouveaux champs
+  fields.forEach(f => { if (!f._rowId && colRowIdMap[f.col]) f._rowId = colRowIdMap[f.col]; });
   if (fields.length === 0) {
     fields = allCols.filter(c => !excludedCols.has(c)).map(col => ({
-      col, label: col, desc: colDescriptions[col] || '', visible: true
+      col, label: col, desc: colDescriptions[col] || '',
+      visible: true, _rowId: colRowIdMap[col] || null
     }));
   } else {
-    // Ajoute les nouvelles colonnes non encore connues
     const existingCols = new Set(fields.map(f => f.col));
     allCols.forEach(col => {
       if (!existingCols.has(col) && !excludedCols.has(col))
-        fields.push({ col, label: col, desc: colDescriptions[col] || '', visible: true });
+        fields.push({ col, label: col, desc: colDescriptions[col] || '',
+                      visible: true, _rowId: colRowIdMap[col] || null });
     });
-    // Met à jour les descriptions non personnalisées
     fields.forEach(f => {
-      if (!f._descCustomized && colDescriptions[f.col])
-        f.desc = colDescriptions[f.col];
+      if (!f._descCustomized && colDescriptions[f.col]) f.desc = colDescriptions[f.col];
     });
   }
   renderTabs();
