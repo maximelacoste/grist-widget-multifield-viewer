@@ -605,7 +605,8 @@ grist.onRecord(async record => {
   const firstRecord = !currentRecord;
   currentRecord = record;
   if (firstRecord) {
-    storageKey = 'grist_mfv_' + btoa(window.location.href).slice(0, 20);
+    const ref = document.referrer || window.location.href;
+    storageKey = 'grist_mfv_' + btoa(ref).slice(0, 24);
     loadOptions();
     await fetchColMeta();
   }
