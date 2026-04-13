@@ -605,11 +605,7 @@ grist.onRecord(async record => {
   const firstRecord = !currentRecord;
   currentRecord = record;
   if (firstRecord) {
-    // Clé localStorage basée sur le tableId pour isoler les instances
-    try {
-      const tableId = await grist.selectedTable.getTableId();
-      storageKey = 'grist_mfv_' + tableId;
-    } catch(e) {}
+    storageKey = 'grist_mfv_' + btoa(window.location.href).slice(0, 20);
     loadOptions();
     await fetchColMeta();
   }
@@ -619,6 +615,13 @@ grist.onRecord(async record => {
       col, label: col, desc: colDescriptions[col] || '', visible: true
     }));
   } else {
+    // Ajoute les nouvelles colonnes non encore connues
+    const existingCols = new Set(fields.map(f => f.col));
+    allCols.forEach(col => {
+      if (!existingCols.has(col) && !excludedCols.has(col))
+        fields.push({ col, label: col, desc: colDescriptions[col] || '', visible: true });
+    });
+    // Met à jour les descriptions non personnalisées
     fields.forEach(f => {
       if (!f._descCustomized && colDescriptions[f.col])
         f.desc = colDescriptions[f.col];
